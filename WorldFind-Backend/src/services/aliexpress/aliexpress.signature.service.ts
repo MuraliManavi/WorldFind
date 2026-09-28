@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-export type SignMethod = 'sha256' | 'md5';
+export type SignMethod = 'md5' | 'hmac' | 'hmac-sha256';
 
 export interface SignOptions {
   appSecret: string;
@@ -10,7 +10,7 @@ export interface SignOptions {
 
 export class AliExpressSignatureService {
   /**
-   * Calculates signature for AliExpress Open Platform API calls.
+   * Calculates signature for AliExpress Open Platform TOP API calls.
    *
    * @param params Key-value dictionary of all request parameters (excluding 'sign')
    * @param options Configuration including appSecret and signMethod
@@ -20,7 +20,7 @@ export class AliExpressSignatureService {
     params: Record<string, string | number | boolean | undefined | null>,
     options: SignOptions
   ): string {
-    const { appSecret, signMethod = 'sha256', apiPath } = options;
+    const { appSecret, signMethod = 'hmac-sha256', apiPath } = options;
 
     if (!appSecret) {
       throw new Error('App Secret is required for signature generation');
@@ -33,41 +33,49 @@ export class AliExpressSignatureService {
       return val !== undefined && val !== null && val !== '';
     });
 
-    // Sort parameter keys alphabetically
+    // Sort parameter keys alphabetically in ASCII byte order
     validKeys.sort();
 
-    // Concatenate key-value pairs
+    // Concatenate key-value pairs without separators
     let queryStr = '';
     for (const key of validKeys) {
       queryStr += `${key}${params[key]}`;
     }
 
     const stringToSign = apiPath ? `${apiPath}${queryStr}` : queryStr;
+    const methodLower = signMethod.toLowerCase();
 
-    if (signMethod === 'sha256') {
+    if (methodLower === 'hmac-sha256' || methodLower === 'sha256') {
       const hmac = crypto.createHmac('sha256', appSecret);
       hmac.update(stringToSign, 'utf8');
       return hmac.digest('hex').toUpperCase();
-    } else if (signMethod === 'md5') {
+    } else if (methodLower === 'md5') {
       const content = `${appSecret}${stringToSign}${appSecret}`;
       return crypto.createHash('md5').update(content, 'utf8').digest('hex').toUpperCase();
+    } else if (methodLower === 'hmac') {
+      const hmac = crypto.createHmac('md5', appSecret);
+      hmac.update(stringToSign, 'utf8');
+      return hmac.digest('hex').toUpperCase();
     } else {
       throw new Error(`Unsupported signature method: ${signMethod}`);
     }
   }
 
   /**
-   * Helper to format current timestamp for AliExpress API (YYYY-MM-DD HH:mm:ss)
+   * Helper to format current timestamp for AliExpress API (YYYY-MM-DD HH:mm:ss in GMT+8 / Beijing time)
    */
   public static getFormattedTimestamp(): string {
     const now = new Date();
+    // Convert to GMT+8 (Beijing Time) as required by AliExpress Open Platform
+    const beijingMs = now.getTime() + (8 * 60 + now.getTimezoneOffset()) * 60000;
+    const beijingTime = new Date(beijingMs);
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const year = now.getFullYear();
-    const month = pad(now.getMonth() + 1);
-    const day = pad(now.getDate());
-    const hours = pad(now.getHours());
-    const minutes = pad(now.getMinutes());
-    const seconds = pad(now.getSeconds());
+    const year = beijingTime.getFullYear();
+    const month = pad(beijingTime.getMonth() + 1);
+    const day = pad(beijingTime.getDate());
+    const hours = pad(beijingTime.getHours());
+    const minutes = pad(beijingTime.getMinutes());
+    const seconds = pad(beijingTime.getSeconds());
 
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   }

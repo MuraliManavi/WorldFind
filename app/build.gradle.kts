@@ -17,15 +17,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "WORLD_FIND_API_BASE_URL", "\"https://worldfind-backend.onrender.com/\"")
+        buildConfigField("String", "WORLD_FIND_API_BASE_URL", "\"https://worldfind.onrender.com/\"")
     }
 
     buildTypes {
         debug {
-            buildConfigField("String", "WORLD_FIND_API_BASE_URL", "\"http://10.0.2.2:8080/\"")
+            buildConfigField("String", "WORLD_FIND_API_BASE_URL", "\"https://worldfind.onrender.com/\"")
         }
         release {
-            buildConfigField("String", "WORLD_FIND_API_BASE_URL", "\"https://worldfind-backend.onrender.com/\"")
+            buildConfigField("String", "WORLD_FIND_API_BASE_URL", "\"https://worldfind.onrender.com/\"")
             optimization {
                 enable = false
             }

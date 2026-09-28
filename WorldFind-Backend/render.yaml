@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: worldfind-backend
+    name: worldfind
     runtime: node
     rootDir: WorldFind-Backend
     buildCommand: npm install && npm run build
@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: "10000"
       - key: WORLD_FIND_API_BASE_URL
-        sync: false
+        value: https://worldfind.onrender.com
       - key: CORS_ORIGIN
         sync: false
       - key: FIREBASE_PROJECT_ID
@@ -30,7 +30,7 @@ services:
       - key: ALIEXPRESS_OAUTH_URL
         value: https://oauth.aliexpress.com/authorize
       - key: ALIEXPRESS_CALLBACK_URL
-        sync: false
+        value: https://worldfind.onrender.com/api/aliexpress/callback
       - key: TOKEN_ENCRYPTION_KEY
         sync: false
       - key: ADMIN_API_KEY

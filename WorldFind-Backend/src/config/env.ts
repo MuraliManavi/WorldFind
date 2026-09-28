@@ -11,7 +11,7 @@ const envSchema = z.object({
     .default('8080')
     .transform((val) => parseInt(val, 10)),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  WORLD_FIND_API_BASE_URL: z.string().default('http://localhost:8080'),
+  WORLD_FIND_API_BASE_URL: z.string().default('https://worldfind.onrender.com'),
   CORS_ORIGIN: z.string().optional(),
 
   // Firebase Credentials
@@ -24,7 +24,7 @@ const envSchema = z.object({
   ALIEXPRESS_APP_SECRET: z.string().default(''),
   ALIEXPRESS_API_BASE_URL: z.string().default('https://api-sg.aliexpress.com/sync'),
   ALIEXPRESS_OAUTH_URL: z.string().default('https://oauth.aliexpress.com/authorize'),
-  ALIEXPRESS_CALLBACK_URL: z.string().default('http://localhost:8080/api/aliexpress/callback'),
+  ALIEXPRESS_CALLBACK_URL: z.string().default('https://worldfind.onrender.com/api/aliexpress/callback'),
 
   // Optional app_signature if required
   ALIEXPRESS_APP_SIGNATURE: z.string().optional(),

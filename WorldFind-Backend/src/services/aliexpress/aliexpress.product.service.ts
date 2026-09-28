@@ -45,8 +45,11 @@ export class AliExpressProductService {
     const trackingId = filter.trackingId || env.DEFAULT_TRACKING_ID;
     const fields = filter.fields || DEFAULT_PRODUCT_FIELDS;
 
+    // Use default keyword 'trending' if neither keywords nor category_ids are passed
+    const keywords = filter.keywords || (filter.categoryIds ? undefined : 'trending');
+
     const apiParams: Record<string, string | number | undefined> = {
-      keywords: filter.keywords,
+      keywords: keywords,
       category_ids: filter.categoryIds,
       min_sale_price: filter.minSalePrice,
       max_sale_price: filter.maxSalePrice,
@@ -63,7 +66,7 @@ export class AliExpressProductService {
       fields: fields,
     };
 
-    logger.info(`Querying AliExpress products: keywords="${filter.keywords || ''}", ship_to_country=${shipToCountry}, currency=${targetCurrency}`);
+    logger.info(`Querying AliExpress products: keywords="${keywords || ''}", categoryIds="${filter.categoryIds || ''}", ship_to_country=${shipToCountry}, currency=${targetCurrency}`);
 
     const response = await AliExpressProductAdapter.queryProducts<{
       resp_result?: {

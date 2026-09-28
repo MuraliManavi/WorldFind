@@ -27,7 +27,7 @@ export class AliExpressClient {
   constructor() {
     this.axiosClient = axios.create({
       baseURL: env.ALIEXPRESS_API_BASE_URL,
-      timeout: 10000,
+      timeout: 15000,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
         'User-Agent': 'WorldFind-Backend/1.0.0',
@@ -43,7 +43,7 @@ export class AliExpressClient {
 
     const config: AliExpressProtocolConfig = {
       baseUrl: env.ALIEXPRESS_API_BASE_URL,
-      signMethod: 'md5',
+      signMethod: 'hmac-sha256',
       apiVersion: '2.0',
       format: 'json',
       timestampFormat: 'datetime',
@@ -54,30 +54,31 @@ export class AliExpressClient {
     const appSecret = env.ALIEXPRESS_APP_SECRET;
 
     if (!appKey || !appSecret || appKey === 'your_app_key_here' || appSecret === 'your_app_secret_here') {
-      throw new BadRequestError('ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET must be configured in backend .env file.');
+      throw new BadRequestError('ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET must be configured in Render Environment Variables.');
     }
 
-    // Resolve active token if required or present
+    // Resolve active token if required by endpoint
     let sessionToken: string | undefined = undefined;
-    const tokenData = await AliExpressTokenService.getToken();
-
-    if (tokenData) {
-      if (AliExpressTokenService.isTokenExpired(tokenData) && tokenData.refresh_token) {
-        logger.info('Access token is expiring or expired. Attempting token refresh before API call...');
-        try {
-          const refreshedToken = await AliExpressOAuthService.refreshToken(tokenData.refresh_token);
-          sessionToken = refreshedToken.access_token;
-        } catch (err) {
-          logger.warn('Failed to auto-refresh token, proceeding with current token:', err);
+    if (requireSession) {
+      const tokenData = await AliExpressTokenService.getToken();
+      if (tokenData) {
+        if (AliExpressTokenService.isTokenExpired(tokenData) && tokenData.refresh_token) {
+          logger.info('Access token is expiring or expired. Attempting token refresh before API call...');
+          try {
+            const refreshedToken = await AliExpressOAuthService.refreshToken(tokenData.refresh_token);
+            sessionToken = refreshedToken.access_token;
+          } catch (err) {
+            logger.warn('Failed to auto-refresh token, proceeding with current token:', err);
+            sessionToken = tokenData.access_token;
+          }
+        } else {
           sessionToken = tokenData.access_token;
         }
-      } else {
-        sessionToken = tokenData.access_token;
       }
-    }
 
-    if (requireSession && !sessionToken) {
-      throw new BadRequestError('This AliExpress API endpoint requires an active authorized session. Please complete OAuth flow.');
+      if (!sessionToken) {
+        throw new BadRequestError('This AliExpress API endpoint requires an active authorized session. Please complete OAuth flow.');
+      }
     }
 
     // Build system parameters
@@ -116,7 +117,7 @@ export class AliExpressClient {
     mergedParams.sign = sign;
 
     try {
-      logger.info(`Sending AliExpress API Request: method=${method}`);
+      logger.info(`Sending AliExpress API Request: method=${method}, sign_method=${config.signMethod}`);
       const formParams = new URLSearchParams(mergedParams);
 
       const response = await this.axiosClient.post(config.baseUrl, formParams.toString());
@@ -125,8 +126,14 @@ export class AliExpressClient {
       if (data.error_response) {
         const err = data.error_response;
         logger.error(`AliExpress Open Platform Error: method=${method}, code=${err.code}, msg=${err.msg}`);
+
+        let safeMsg = err.msg || 'AliExpress API Call Failed';
+        if (err.code === 'IncompleteSignature' || (err.msg && err.msg.includes('signature'))) {
+          safeMsg = 'The request signature does not conform to platform standards. Please verify your ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET in Render Environment Variables.';
+        }
+
         throw new AliExpressApiError(
-          err.msg || 'AliExpress API Call Failed',
+          safeMsg,
           String(err.code || 'UNKNOWN'),
           err.sub_code
         );
@@ -149,7 +156,6 @@ export class AliExpressClient {
         throw new AliExpressApiError(userMsg, error.response?.status?.toString() || 'TIMEOUT');
       }
 
-      logger.error(`Unexpected error in AliExpress Client execute:`, error);
       throw error;
     }
   }

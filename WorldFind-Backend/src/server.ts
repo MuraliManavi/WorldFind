@@ -15,7 +15,7 @@ const startServer = async () => {
     logger.info(` WorldFind Backend Service is Running!`);
     logger.info(` Environment: ${env.NODE_ENV}`);
     logger.info(` Listening on: http://0.0.0.0:${port}`);
-    logger.info(` Local Emulator Base URL: http://10.0.2.2:${port}/`);
+    logger.info(` Base URL: ${env.WORLD_FIND_API_BASE_URL}`);
     logger.info(`==================================================`);
   });
 
