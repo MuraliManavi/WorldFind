@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1053003372736",
+    "project_id": "worldfind-d91ea",
+    "storage_bucket": "worldfind-d91ea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1053003372736:android:1b0af5a61adf8f501df525",
+        "android_client_info": {
+          "package_name": "com.murali.worldfind"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeK744R9vUn0Ap0oyJjmYkjw0LPf2qBG8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

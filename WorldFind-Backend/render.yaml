@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: worldfind-backend
+    runtime: node
+    rootDir: WorldFind-Backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: WORLD_FIND_API_BASE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: ALIEXPRESS_APP_KEY
+        sync: false
+      - key: ALIEXPRESS_APP_SECRET
+        sync: false
+      - key: ALIEXPRESS_API_BASE_URL
+        value: https://api-sg.aliexpress.com/sync
+      - key: ALIEXPRESS_OAUTH_URL
+        value: https://oauth.aliexpress.com/authorize
+      - key: ALIEXPRESS_CALLBACK_URL
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: DEFAULT_SHIP_TO_COUNTRY
+        value: IN
+      - key: DEFAULT_TARGET_CURRENCY
+        value: INR
+      - key: DEFAULT_TARGET_LANGUAGE
+        value: EN
+      - key: DEFAULT_TRACKING_ID
+        value: worldfind_default

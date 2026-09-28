@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WorldFind Launcher Icon Foreground
+  Composition: Globe + Shopping Bag + Search Symbol (Branded Asset)
+  Optical Alignment: Centered with 15-20% breathing room
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@drawable/app_logo"
+        android:gravity="center"
+        android:width="66dp"
+        android:height="66dp" />
+</layer-list>

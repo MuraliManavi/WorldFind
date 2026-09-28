@@ -1,0 +1,38 @@
+# Android / Gradle
+.gradle/
+.idea/
+*.iml
+local.properties
+build/
+app/build/
+
+# Backend dependencies/build
+WorldFind-Backend/node_modules/
+WorldFind-Backend/dist/
+
+# Backend secrets
+WorldFind-Backend/.env
+WorldFind-Backend/.env.local
+WorldFind-Backend/.env.production
+WorldFind-Backend/.env.test
+
+# Backend logs
+WorldFind-Backend/*.log
+WorldFind-Backend/logs/
+
+# Local tunnel / development binaries
+WorldFind-Backend/cloudflared.exe
+
+# Firebase/private credentials
+WorldFind-Backend/service-account.json
+WorldFind-Backend/firebase-key.json
+
+# Test coverage
+WorldFind-Backend/coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local project artifacts
+.artifacts/
