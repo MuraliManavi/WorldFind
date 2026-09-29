@@ -1,6 +1,7 @@
 import { AliExpressProductAdapter } from './adapters/aliexpress.product.adapter';
 import { ProductQueryFilter, PaginatedProductsResponse, WorldFindProduct } from '../../models/Product';
 import { ProductNormalizer, RawAliExpressProduct } from '../product/product.normalizer';
+import { AliExpressApiError } from '../../utils/errors';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 
@@ -66,8 +67,8 @@ export class AliExpressProductService {
     const targetLanguage = filter.targetLanguage || env.DEFAULT_TARGET_LANGUAGE;
     const trackingId = filter.trackingId || env.DEFAULT_TRACKING_ID;
 
-    // Default search keyword 'trending' when neither keywords nor category_ids are specified
-    const keywords = filter.keywords || (filter.categoryIds ? undefined : 'trending');
+    // Default search keyword 'phone' when neither keywords nor category_ids are specified
+    const keywords = filter.keywords || (filter.categoryIds ? undefined : 'phone');
 
     const apiParams: Record<string, string | number | undefined> = {
       keywords: keywords,
@@ -103,13 +104,41 @@ export class AliExpressProductService {
     logger.info(`[AliExpressProductService] Raw response top-level structure:`, {
       hasRespResult: Boolean(response?.resp_result),
       hasResult: Boolean(response?.result || response?.resp_result?.result),
-      hasProductsContainer: Boolean(
-        response?.products || response?.result?.products || response?.resp_result?.result?.products
-      ),
+      respCode: response?.resp_result?.resp_code || 'N/A',
+      respMsg: response?.resp_result?.resp_msg || 'N/A',
       topKeys: response && typeof response === 'object' ? Object.keys(response) : [],
     });
 
-    const { products: rawList, totalCount, totalPages } = this.extractProductsAndPagination(response);
+    // Check if AliExpress resp_result returned an upstream status error code
+    if (response?.resp_result?.resp_code && Number(response.resp_result.resp_code) !== 200) {
+      const respCode = String(response.resp_result.resp_code);
+      const respMsg = response.resp_result.resp_msg || 'AliExpress Open Platform returned non-200 response code';
+      logger.error(`[AliExpressProductService] Upstream resp_code error: code=${respCode}, msg=${respMsg}`);
+      throw new AliExpressApiError(respMsg, respCode);
+    }
+
+    let { products: rawList, totalCount, totalPages } = this.extractProductsAndPagination(response);
+
+    // Fallback query if country-restricted query returns zero products
+    if (rawList.length === 0 && shipToCountry === 'IN' && !filter.shipToCountry) {
+      logger.info(`[AliExpressProductService] Zero products for country=${shipToCountry}. Retrying with global default country=US/USD...`);
+      const fallbackParams = {
+        ...apiParams,
+        ship_to_country: 'US',
+        target_currency: 'USD',
+      };
+      try {
+        const fallbackResp = await AliExpressProductAdapter.queryProducts<any>(fallbackParams);
+        const fallbackExtracted = this.extractProductsAndPagination(fallbackResp);
+        if (fallbackExtracted.products.length > 0) {
+          rawList = fallbackExtracted.products;
+          totalCount = fallbackExtracted.totalCount;
+          totalPages = fallbackExtracted.totalPages;
+        }
+      } catch (fallbackErr) {
+        logger.warn('[AliExpressProductService] Fallback query failed:', fallbackErr);
+      }
+    }
 
     const pageSize = filter.pageSize || 20;
     const currentPage = filter.page || 1;
