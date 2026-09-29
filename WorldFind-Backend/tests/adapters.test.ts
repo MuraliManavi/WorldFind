@@ -1,7 +1,9 @@
 import { AliExpressProtocolAdapter } from '../src/services/aliexpress/adapters/aliexpress.protocol.adapter';
 import { AliExpressProductAdapter } from '../src/services/aliexpress/adapters/aliexpress.product.adapter';
+import { AliExpressProductService } from '../src/services/aliexpress/aliexpress.product.service';
 import { AliExpressTokenService } from '../src/services/aliexpress/aliexpress.token.service';
 import { AliExpressOAuthService } from '../src/services/aliexpress/aliexpress.oauth.service';
+import { BadRequestError } from '../src/utils/errors';
 
 describe('AliExpress Protocol Adapters & Production Safety Tests', () => {
   it('AliExpressProtocolAdapter should attach app_signature if provided in payload or environment', () => {
@@ -20,6 +22,25 @@ describe('AliExpress Protocol Adapters & Production Safety Tests', () => {
     expect(typeof AliExpressProductAdapter.getProductDetail).toBe('function');
     expect(typeof AliExpressProductAdapter.generateAffiliateLinks).toBe('function');
     expect(typeof AliExpressProductAdapter.getCategories).toBe('function');
+  });
+
+  it('AliExpressProductService.resolveTrackingId should omit missing or known placeholder tracking IDs', () => {
+    expect(AliExpressProductService.resolveTrackingId(undefined)).toBeUndefined();
+    expect(AliExpressProductService.resolveTrackingId('')).toBeUndefined();
+    expect(AliExpressProductService.resolveTrackingId('worldfind_default')).toBeUndefined();
+    expect(AliExpressProductService.resolveTrackingId('your_tracking_id')).toBeUndefined();
+    expect(AliExpressProductService.resolveTrackingId('test_tracking_id')).toBeUndefined();
+    expect(AliExpressProductService.resolveTrackingId('demo_tracking_id')).toBeUndefined();
+  });
+
+  it('AliExpressProductService.resolveTrackingId should preserve legitimate non-placeholder tracking IDs', () => {
+    const legitimate = 'my_real_tracking_id_2026';
+    expect(AliExpressProductService.resolveTrackingId(legitimate)).toBe('my_real_tracking_id_2026');
+  });
+
+  it('AliExpressProductService.requireTrackingId should require valid tracking ID for affiliate link generation', () => {
+    expect(() => AliExpressProductService.requireTrackingId('worldfind_default')).toThrow(BadRequestError);
+    expect(AliExpressProductService.requireTrackingId('valid_affiliate_tag')).toBe('valid_affiliate_tag');
   });
 
   it('AliExpressTokenService.getToken should reject static token fallback in production mode', async () => {

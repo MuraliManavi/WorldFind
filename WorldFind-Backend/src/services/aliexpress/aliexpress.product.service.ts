@@ -1,11 +1,49 @@
 import { AliExpressProductAdapter } from './adapters/aliexpress.product.adapter';
 import { ProductQueryFilter, PaginatedProductsResponse, WorldFindProduct } from '../../models/Product';
 import { ProductNormalizer, RawAliExpressProduct } from '../product/product.normalizer';
-import { AliExpressApiError } from '../../utils/errors';
+import { AliExpressApiError, BadRequestError } from '../../utils/errors';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 
+const KNOWN_TRACKING_ID_PLACEHOLDERS = [
+  'worldfind_default',
+  'your_tracking_id',
+  'your_tracking_id_here',
+  'default_tracking_id',
+  'trackingid',
+  'test_tracking_id',
+  'demo_tracking_id',
+  'example_tracking_id',
+];
+
 export class AliExpressProductService {
+  /**
+   * Resolves optional tracking ID for product queries:
+   * Returns trimmed legitimate tracking ID or undefined if missing/placeholder.
+   */
+  public static resolveTrackingId(trackingId?: string): string | undefined {
+    if (!trackingId) return undefined;
+    const trimmed = trackingId.trim();
+    if (!trimmed || KNOWN_TRACKING_ID_PLACEHOLDERS.includes(trimmed.toLowerCase())) {
+      return undefined;
+    }
+    return trimmed;
+  }
+
+  /**
+   * Validates required tracking ID for affiliate link generation:
+   * Throws BadRequestError if missing or placeholder.
+   */
+  public static requireTrackingId(trackingId?: string): string {
+    const resolved = this.resolveTrackingId(trackingId);
+    if (!resolved) {
+      throw new BadRequestError(
+        'A valid registered AliExpress Affiliate Tracking ID is required to generate affiliate links. Please set DEFAULT_TRACKING_ID in Render Environment Variables.'
+      );
+    }
+    return resolved;
+  }
+
   /**
    * Safe recursive product list and pagination extractor supporting all TOP/IOP response shapes
    */
@@ -65,7 +103,9 @@ export class AliExpressProductService {
     const shipToCountry = filter.shipToCountry || env.DEFAULT_SHIP_TO_COUNTRY;
     const targetCurrency = filter.targetCurrency || env.DEFAULT_TARGET_CURRENCY;
     const targetLanguage = filter.targetLanguage || env.DEFAULT_TARGET_LANGUAGE;
-    const trackingId = filter.trackingId || env.DEFAULT_TRACKING_ID;
+
+    // Resolve optional tracking ID (omitted if placeholder or missing)
+    const trackingId = this.resolveTrackingId(filter.trackingId || env.DEFAULT_TRACKING_ID);
 
     // Default search keyword 'phone' when neither keywords nor category_ids are specified
     const keywords = filter.keywords || (filter.categoryIds ? undefined : 'phone');
@@ -94,6 +134,7 @@ export class AliExpressProductService {
       shipToCountry,
       targetCurrency,
       targetLanguage,
+      hasTrackingId: Boolean(trackingId),
       page: filter.page || 1,
       pageSize: filter.pageSize || 20,
     });
@@ -175,13 +216,15 @@ export class AliExpressProductService {
   ): Promise<WorldFindProduct | null> {
     logger.info(`Fetching product details: productId=${productId}`);
 
+    const resolvedTrackingId = this.resolveTrackingId(trackingId);
+
     // First try aliexpress.affiliate.productdetail.get
     try {
       const response = await AliExpressProductAdapter.getProductDetail<any>({
         product_ids: productId,
         target_currency: targetCurrency,
         target_language: targetLanguage,
-        tracking_id: trackingId,
+        tracking_id: resolvedTrackingId,
         country: shipToCountry,
       });
 
@@ -199,7 +242,7 @@ export class AliExpressProductService {
         product_ids: productId,
         target_currency: targetCurrency,
         target_language: targetLanguage,
-        tracking_id: trackingId,
+        tracking_id: resolvedTrackingId,
         ship_to_country: shipToCountry,
       });
 
@@ -224,6 +267,8 @@ export class AliExpressProductService {
   ): Promise<Array<{ sourceUrl: string; promotionUrl: string }>> {
     logger.info(`Generating affiliate links for ${sourceUrls.length} URL(s)`);
 
+    const validTrackingId = this.requireTrackingId(trackingId);
+
     const response = await AliExpressProductAdapter.generateAffiliateLinks<{
       resp_result?: {
         result?: {
@@ -235,7 +280,7 @@ export class AliExpressProductService {
     }>({
       promotion_link_type: promotionLinkType,
       source_values: sourceUrls.join(','),
-      tracking_id: trackingId,
+      tracking_id: validTrackingId,
     });
 
     const links = response.resp_result?.result?.promotion_links?.promotion_link || [];
