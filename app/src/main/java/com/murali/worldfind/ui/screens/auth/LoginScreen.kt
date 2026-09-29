@@ -150,7 +150,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         WorldFindOutlinedButton(
-            text = "CREATE ACCOUNT",
+            text = "CREATE ACCOUNT! IF YOU DON'T HAVE ACCOUNT",
             enabled = authState !is AuthState.Loading,
             onClick = onRegisterClick
         )

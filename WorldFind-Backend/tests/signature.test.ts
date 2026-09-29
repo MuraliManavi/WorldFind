@@ -14,7 +14,7 @@ describe('AliExpress Signature Calculation', () => {
 
     const signature = AliExpressSignatureService.generateSignature(params, {
       appSecret: testSecret,
-      signMethod: 'hmac-sha256',
+      signMethod: 'sha256',
     });
 
     expect(typeof signature).toBe('string');

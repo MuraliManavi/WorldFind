@@ -43,7 +43,7 @@ export class AliExpressClient {
 
     const config: AliExpressProtocolConfig = {
       baseUrl: env.ALIEXPRESS_API_BASE_URL,
-      signMethod: 'hmac-sha256',
+      signMethod: 'sha256',
       apiVersion: '2.0',
       format: 'json',
       timestampFormat: 'datetime',
@@ -108,7 +108,7 @@ export class AliExpressClient {
       }
     }
 
-    // Calculate signature
+    // Calculate signature (excludes 'sign' key)
     const sign = AliExpressSignatureService.generateSignature(mergedParams, {
       appSecret,
       signMethod: config.signMethod,
@@ -116,12 +116,23 @@ export class AliExpressClient {
 
     mergedParams.sign = sign;
 
-    try {
-      logger.info(`Sending AliExpress API Request: method=${method}, sign_method=${config.signMethod}`);
-      const formParams = new URLSearchParams(mergedParams);
+    const startTime = Date.now();
 
+    try {
+      logger.info(`[AliExpressClient] Executing signed API request:`, {
+        method,
+        baseUrl: config.baseUrl,
+        signMethod: config.signMethod,
+        timestamp: timestampStr,
+        signedParamKeys: Object.keys(mergedParams).filter((k) => k !== 'sign').sort(),
+      });
+
+      const formParams = new URLSearchParams(mergedParams);
       const response = await this.axiosClient.post(config.baseUrl, formParams.toString());
       const data = response.data;
+      const duration = Date.now() - startTime;
+
+      logger.info(`[AliExpressClient] Response received for method=${method} in ${duration}ms`);
 
       if (data.error_response) {
         const err = data.error_response;

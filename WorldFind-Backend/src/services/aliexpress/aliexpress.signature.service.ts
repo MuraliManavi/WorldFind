@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-export type SignMethod = 'md5' | 'hmac' | 'hmac-sha256';
+export type SignMethod = 'sha256' | 'hmac' | 'md5';
 
 export interface SignOptions {
   appSecret: string;
@@ -10,7 +10,7 @@ export interface SignOptions {
 
 export class AliExpressSignatureService {
   /**
-   * Calculates signature for AliExpress Open Platform TOP API calls.
+   * Calculates signature for AliExpress Open Platform TOP API calls according to official protocol standards.
    *
    * @param params Key-value dictionary of all request parameters (excluding 'sign')
    * @param options Configuration including appSecret and signMethod
@@ -20,23 +20,23 @@ export class AliExpressSignatureService {
     params: Record<string, string | number | boolean | undefined | null>,
     options: SignOptions
   ): string {
-    const { appSecret, signMethod = 'hmac-sha256', apiPath } = options;
+    const { appSecret, signMethod = 'sha256', apiPath } = options;
 
     if (!appSecret) {
       throw new Error('App Secret is required for signature generation');
     }
 
-    // Filter out undefined, null, and 'sign' parameter
+    // 1. Filter out undefined, null, empty strings, and 'sign' parameter
     const validKeys = Object.keys(params).filter((key) => {
       if (key === 'sign') return false;
       const val = params[key];
       return val !== undefined && val !== null && val !== '';
     });
 
-    // Sort parameter keys alphabetically in ASCII byte order
+    // 2. Sort parameter keys alphabetically in ASCII byte order
     validKeys.sort();
 
-    // Concatenate key-value pairs without separators
+    // 3. Concatenate key-value pairs without separators: key1value1key2value2...
     let queryStr = '';
     for (const key of validKeys) {
       queryStr += `${key}${params[key]}`;
@@ -45,17 +45,21 @@ export class AliExpressSignatureService {
     const stringToSign = apiPath ? `${apiPath}${queryStr}` : queryStr;
     const methodLower = signMethod.toLowerCase();
 
-    if (methodLower === 'hmac-sha256' || methodLower === 'sha256') {
+    // 4. Compute HMAC/MD5 according to official TOP protocol parameter value:
+    // "sha256" -> HMAC-SHA256
+    // "hmac"   -> HMAC-MD5
+    // "md5"    -> appSecret + stringToSign + appSecret MD5
+    if (methodLower === 'sha256' || methodLower === 'hmac-sha256') {
       const hmac = crypto.createHmac('sha256', appSecret);
+      hmac.update(stringToSign, 'utf8');
+      return hmac.digest('hex').toUpperCase();
+    } else if (methodLower === 'hmac') {
+      const hmac = crypto.createHmac('md5', appSecret);
       hmac.update(stringToSign, 'utf8');
       return hmac.digest('hex').toUpperCase();
     } else if (methodLower === 'md5') {
       const content = `${appSecret}${stringToSign}${appSecret}`;
       return crypto.createHash('md5').update(content, 'utf8').digest('hex').toUpperCase();
-    } else if (methodLower === 'hmac') {
-      const hmac = crypto.createHmac('md5', appSecret);
-      hmac.update(stringToSign, 'utf8');
-      return hmac.digest('hex').toUpperCase();
     } else {
       throw new Error(`Unsupported signature method: ${signMethod}`);
     }

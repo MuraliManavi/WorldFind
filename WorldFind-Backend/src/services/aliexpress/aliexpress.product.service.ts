@@ -4,37 +4,59 @@ import { ProductNormalizer, RawAliExpressProduct } from '../product/product.norm
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 
-const DEFAULT_PRODUCT_FIELDS = [
-  'app_sale_price',
-  'commission_rate',
-  'discount',
-  'evaluate_rate',
-  'first_level_category_id',
-  'first_level_category_name',
-  'original_price',
-  'product_detail_url',
-  'product_id',
-  'product_main_image_url',
-  'product_small_image_urls',
-  'product_title',
-  'product_video_url',
-  'promotion_link',
-  'second_level_category_id',
-  'second_level_category_name',
-  'shop_id',
-  'shop_url',
-  'target_app_sale_price',
-  'target_app_sale_price_currency',
-  'target_original_price',
-  'target_original_price_currency',
-  'target_sale_price',
-  'target_sale_price_currency',
-  'ship_to_days',
-  'total_page_no',
-  'total_record_count',
-].join(',');
-
 export class AliExpressProductService {
+  /**
+   * Safe recursive product list and pagination extractor supporting all TOP/IOP response shapes
+   */
+  private static extractProductsAndPagination(payload: any): {
+    products: RawAliExpressProduct[];
+    totalCount: number;
+    totalPages: number;
+  } {
+    if (!payload || typeof payload !== 'object') {
+      return { products: [], totalCount: 0, totalPages: 1 };
+    }
+
+    // Resolve result container object
+    const resultObj =
+      payload.resp_result?.result ||
+      payload.result?.resp_result ||
+      payload.result ||
+      payload.resp_result ||
+      payload;
+
+    const totalCount =
+      resultObj.total_record_count ||
+      payload.total_record_count ||
+      payload.resp_result?.result?.total_record_count ||
+      0;
+
+    const totalPages =
+      resultObj.total_page_no ||
+      payload.total_page_no ||
+      payload.resp_result?.result?.total_page_no ||
+      1;
+
+    // Resolve products container
+    const productsContainer = resultObj.products || payload.products || resultObj;
+
+    let rawList: RawAliExpressProduct[] = [];
+
+    if (Array.isArray(productsContainer)) {
+      rawList = productsContainer;
+    } else if (productsContainer && typeof productsContainer === 'object') {
+      if (Array.isArray(productsContainer.product)) {
+        rawList = productsContainer.product;
+      } else if (productsContainer.product && typeof productsContainer.product === 'object') {
+        rawList = [productsContainer.product];
+      } else if ('product_id' in productsContainer || 'target_product_id' in productsContainer) {
+        rawList = [productsContainer];
+      }
+    }
+
+    return { products: rawList, totalCount, totalPages };
+  }
+
   /**
    * Query AliExpress products using aliexpress.affiliate.product.query
    */
@@ -43,9 +65,8 @@ export class AliExpressProductService {
     const targetCurrency = filter.targetCurrency || env.DEFAULT_TARGET_CURRENCY;
     const targetLanguage = filter.targetLanguage || env.DEFAULT_TARGET_LANGUAGE;
     const trackingId = filter.trackingId || env.DEFAULT_TRACKING_ID;
-    const fields = filter.fields || DEFAULT_PRODUCT_FIELDS;
 
-    // Use default keyword 'trending' if neither keywords nor category_ids are passed
+    // Default search keyword 'trending' when neither keywords nor category_ids are specified
     const keywords = filter.keywords || (filter.categoryIds ? undefined : 'trending');
 
     const apiParams: Record<string, string | number | undefined> = {
@@ -63,50 +84,38 @@ export class AliExpressProductService {
       ship_to_country: shipToCountry,
       delivery_days: filter.deliveryDays,
       platform_product_type: filter.platformProductType,
-      fields: fields,
+      fields: filter.fields || undefined,
     };
 
-    logger.info(`Querying AliExpress products: keywords="${keywords || ''}", categoryIds="${filter.categoryIds || ''}", ship_to_country=${shipToCountry}, currency=${targetCurrency}`);
+    logger.info(`[AliExpressProductService] Querying AliExpress products:`, {
+      keywords: keywords || 'N/A',
+      categoryIds: filter.categoryIds || 'N/A',
+      shipToCountry,
+      targetCurrency,
+      targetLanguage,
+      page: filter.page || 1,
+      pageSize: filter.pageSize || 20,
+    });
 
-    const response = await AliExpressProductAdapter.queryProducts<{
-      resp_result?: {
-        result?: {
-          products?: { product?: RawAliExpressProduct[] | RawAliExpressProduct } | RawAliExpressProduct[];
-          total_record_count?: number;
-          total_page_no?: number;
-          current_record_count?: number;
-          current_page_no?: number;
-        };
-      };
-      result?: {
-        products?: { product?: RawAliExpressProduct[] | RawAliExpressProduct } | RawAliExpressProduct[];
-        total_record_count?: number;
-        total_page_no?: number;
-        current_record_count?: number;
-      };
-    }>(apiParams);
+    const response = await AliExpressProductAdapter.queryProducts<any>(apiParams);
 
-    let rawList: RawAliExpressProduct[] = [];
-    let totalCount = 0;
+    // Safe diagnostic logging of raw response shape (no secrets)
+    logger.info(`[AliExpressProductService] Raw response top-level structure:`, {
+      hasRespResult: Boolean(response?.resp_result),
+      hasResult: Boolean(response?.result || response?.resp_result?.result),
+      hasProductsContainer: Boolean(
+        response?.products || response?.result?.products || response?.resp_result?.result?.products
+      ),
+      topKeys: response && typeof response === 'object' ? Object.keys(response) : [],
+    });
+
+    const { products: rawList, totalCount, totalPages } = this.extractProductsAndPagination(response);
+
     const pageSize = filter.pageSize || 20;
     const currentPage = filter.page || 1;
-    let totalPages = 1;
-    let currentRecordCount = 0;
+    const currentRecordCount = rawList.length;
 
-    const resultObj = response.resp_result?.result || response.result;
-    if (resultObj) {
-      totalCount = resultObj.total_record_count || 0;
-      totalPages = resultObj.total_page_no || Math.ceil(totalCount / pageSize) || 1;
-
-      if (Array.isArray(resultObj.products)) {
-        rawList = resultObj.products;
-      } else if (resultObj.products && 'product' in resultObj.products) {
-        const prod = resultObj.products.product;
-        rawList = Array.isArray(prod) ? prod : prod ? [prod] : [];
-      }
-
-      currentRecordCount = resultObj.current_record_count || rawList.length;
-    }
+    logger.info(`[AliExpressProductService] Extraction complete: rawProductsCount=${rawList.length}, totalCount=${totalCount}, totalPages=${totalPages}`);
 
     const normalizedProducts = ProductNormalizer.normalizeProductsList(rawList, shipToCountry);
     const hasNextPage = currentPage < totalPages || (totalCount > 0 && currentPage * pageSize < totalCount);
@@ -139,33 +148,15 @@ export class AliExpressProductService {
 
     // First try aliexpress.affiliate.productdetail.get
     try {
-      const response = await AliExpressProductAdapter.getProductDetail<{
-        resp_result?: {
-          result?: {
-            products?: { product?: RawAliExpressProduct[] | RawAliExpressProduct } | RawAliExpressProduct[];
-          };
-        };
-      }>({
+      const response = await AliExpressProductAdapter.getProductDetail<any>({
         product_ids: productId,
         target_currency: targetCurrency,
         target_language: targetLanguage,
         tracking_id: trackingId,
         country: shipToCountry,
-        fields: DEFAULT_PRODUCT_FIELDS,
       });
 
-      let rawList: RawAliExpressProduct[] = [];
-      const resultObj = response.resp_result?.result;
-
-      if (resultObj && resultObj.products) {
-        if (Array.isArray(resultObj.products)) {
-          rawList = resultObj.products;
-        } else if ('product' in resultObj.products) {
-          const prod = resultObj.products.product;
-          rawList = Array.isArray(prod) ? prod : prod ? [prod] : [];
-        }
-      }
-
+      const { products: rawList } = this.extractProductsAndPagination(response);
       if (rawList.length > 0) {
         return ProductNormalizer.normalizeProduct(rawList[0], shipToCountry);
       }
@@ -175,35 +166,15 @@ export class AliExpressProductService {
 
     // Fallback via aliexpress.affiliate.product.query with product_ids parameter
     try {
-      const response = await AliExpressProductAdapter.queryProducts<{
-        resp_result?: {
-          result?: {
-            products?: { product?: RawAliExpressProduct[] | RawAliExpressProduct } | RawAliExpressProduct[];
-          };
-        };
-        result?: {
-          products?: { product?: RawAliExpressProduct[] | RawAliExpressProduct } | RawAliExpressProduct[];
-        };
-      }>({
+      const response = await AliExpressProductAdapter.queryProducts<any>({
         product_ids: productId,
         target_currency: targetCurrency,
         target_language: targetLanguage,
         tracking_id: trackingId,
         ship_to_country: shipToCountry,
-        fields: DEFAULT_PRODUCT_FIELDS,
       });
 
-      const resultObj = response.resp_result?.result || response.result;
-      let rawList: RawAliExpressProduct[] = [];
-      if (resultObj && resultObj.products) {
-        if (Array.isArray(resultObj.products)) {
-          rawList = resultObj.products;
-        } else if ('product' in resultObj.products) {
-          const prod = resultObj.products.product;
-          rawList = Array.isArray(prod) ? prod : prod ? [prod] : [];
-        }
-      }
-
+      const { products: rawList } = this.extractProductsAndPagination(response);
       if (rawList.length > 0) {
         return ProductNormalizer.normalizeProduct(rawList[0], shipToCountry);
       }
