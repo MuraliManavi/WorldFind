@@ -41,6 +41,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   orderStatus: OrderStatus;
+  paymentId?: string;
   shippingAddress: {
     name: string;
     phone: string;

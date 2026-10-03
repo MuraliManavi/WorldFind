@@ -104,15 +104,13 @@ fun AppNavigation(
             composable(Screen.Splash.route) {
                 SplashScreen(
                     onFinished = {
-                        if (isOnboardingCompleted != null) {
-                            val destination = when {
-                                currentUser != null -> Screen.Home.route
-                                isOnboardingCompleted == true -> Screen.Login.route
-                                else -> Screen.Onboarding.route
-                            }
-                            navController.navigate(destination) {
-                                popUpTo(Screen.Splash.route) { inclusive = true }
-                            }
+                        val destination = when {
+                            currentUser != null -> Screen.Home.route
+                            isOnboardingCompleted == false -> Screen.Onboarding.route
+                            else -> Screen.Home.route
+                        }
+                        navController.navigate(destination) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
                         }
                     }
                 )

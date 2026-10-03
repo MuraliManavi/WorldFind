@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { RazorpayService } from '../services/payment/razorpay.service';
+import { OrderService } from '../services/order/order.service';
 import { BadRequestError } from '../utils/errors';
 
 export class PaymentController {
@@ -20,7 +21,27 @@ export class PaymentController {
 
   public static async verifyRazorpayPayment(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+      const userId = req.user?.uid || 'dev_user_001';
+      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId } = req.body;
+
+      if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+        throw new BadRequestError('razorpayOrderId, razorpayPaymentId, and razorpaySignature are required.');
+      }
+
+      if (orderId) {
+        const order = await OrderService.verifyOrderPayment(userId, orderId, {
+          razorpayOrderId,
+          razorpayPaymentId,
+          razorpaySignature,
+        });
+        res.status(200).json({
+          success: true,
+          message: 'Payment verified and order confirmed successfully.',
+          data: order,
+        });
+        return;
+      }
+
       const isValid = RazorpayService.verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
 
       if (!isValid) {

@@ -1,10 +1,27 @@
 import { Address } from '../../models/Address';
 import { getFirestoreDb } from '../../config/firebase';
-import { NotFoundError } from '../../utils/errors';
+import { NotFoundError, BadRequestError } from '../../utils/errors';
 
 const memoryAddressStore = new Map<string, Address[]>();
 
 export class AddressService {
+  private static validateIndianAddress(addressData: Partial<Address>): void {
+    if (addressData.phone) {
+      const cleanPhone = addressData.phone.replace(/[\s\-\+\(\)]/g, '');
+      const digits = cleanPhone.slice(-10);
+      if (digits.length !== 10 || !/^[6-9][0-9]{9}$/.test(digits)) {
+        throw new BadRequestError('Invalid phone number. Please enter a valid 10-digit mobile number.');
+      }
+    }
+
+    if (addressData.postalCode) {
+      const cleanPin = addressData.postalCode.replace(/\s+/g, '');
+      if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
+        throw new BadRequestError('Invalid PIN code. Please enter a valid 6-digit Indian PIN code (e.g. 110001, 400001, 560001).');
+      }
+    }
+  }
+
   public static async getAddresses(userId: string): Promise<Address[]> {
     const db = getFirestoreDb();
     if (!db) {
@@ -16,6 +33,8 @@ export class AddressService {
   }
 
   public static async addAddress(userId: string, addressData: Partial<Address>): Promise<Address> {
+    this.validateIndianAddress(addressData);
+
     const now = Date.now();
     const addressId = `addr_${now}_${Math.random().toString(36).substring(2, 7)}`;
     const addresses = await this.getAddresses(userId);
@@ -61,6 +80,8 @@ export class AddressService {
   }
 
   public static async updateAddress(userId: string, addressId: string, addressData: Partial<Address>): Promise<Address> {
+    this.validateIndianAddress(addressData);
+
     const addresses = await this.getAddresses(userId);
     const existing = addresses.find((a) => a.id === addressId);
     if (!existing) {

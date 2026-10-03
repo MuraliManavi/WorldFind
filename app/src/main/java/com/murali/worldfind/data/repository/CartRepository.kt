@@ -16,7 +16,7 @@ class CartRepository(
     suspend fun fetchCart(): Result<CartSummaryDto> {
         return try {
             val response = api.getCart()
-            if (response.isSuccessful && response.body()?.success == true && response.body()?.data != null) {
+            if (response.isSuccessful && response.body() != null && response.body()!!.success && response.body()!!.data != null) {
                 val summary = response.body()!!.data!!
                 _cartItems.value = summary.items.map { it.toDomainCartItem() }
                 Result.success(summary)
@@ -31,22 +31,22 @@ class CartRepository(
     suspend fun addToCart(productId: String, quantity: Int = 1): Result<CartSummaryDto> {
         return try {
             val response = api.addToCart(AddToCartRequest(productId, quantity))
-            if (response.isSuccessful && response.body()?.success == true && response.body()?.data != null) {
+            if (response.isSuccessful && response.body() != null && response.body()!!.success && response.body()!!.data != null) {
                 val summary = response.body()!!.data!!
                 _cartItems.value = summary.items.map { it.toDomainCartItem() }
                 Result.success(summary)
             } else {
-                Result.failure(Exception("Failed to add item to cart"))
+                Result.failure(Exception(response.body()?.error?.message ?: "Failed to add item to cart"))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun updateQuantity(productId: String, quantity: Int): Result<CartSummaryDto> {
+    suspend fun updateQuantity(cartItemId: String, quantity: Int): Result<CartSummaryDto> {
         return try {
-            val response = api.updateCartQuantity(productId, UpdateCartQuantityRequest(quantity))
-            if (response.isSuccessful && response.body()?.success == true && response.body()?.data != null) {
+            val response = api.updateCartQuantity(cartItemId, UpdateCartQuantityRequest(quantity))
+            if (response.isSuccessful && response.body() != null && response.body()!!.success && response.body()!!.data != null) {
                 val summary = response.body()!!.data!!
                 _cartItems.value = summary.items.map { it.toDomainCartItem() }
                 Result.success(summary)
@@ -58,10 +58,10 @@ class CartRepository(
         }
     }
 
-    suspend fun removeFromCart(productId: String): Result<CartSummaryDto> {
+    suspend fun removeFromCart(cartItemId: String): Result<CartSummaryDto> {
         return try {
-            val response = api.removeFromCart(productId)
-            if (response.isSuccessful && response.body()?.success == true && response.body()?.data != null) {
+            val response = api.removeFromCart(cartItemId)
+            if (response.isSuccessful && response.body() != null && response.body()!!.success && response.body()!!.data != null) {
                 val summary = response.body()!!.data!!
                 _cartItems.value = summary.items.map { it.toDomainCartItem() }
                 Result.success(summary)
@@ -76,7 +76,7 @@ class CartRepository(
     suspend fun clearCart(): Result<CartSummaryDto> {
         return try {
             val response = api.clearCart()
-            if (response.isSuccessful && response.body()?.success == true && response.body()?.data != null) {
+            if (response.isSuccessful && response.body() != null && response.body()!!.success && response.body()!!.data != null) {
                 val summary = response.body()!!.data!!
                 _cartItems.value = emptyList()
                 Result.success(summary)
@@ -95,8 +95,8 @@ class CartRepository(
                 title = product.title,
                 description = product.description,
                 imageUrl = product.imageUrl,
-                category = product.category,
-                rating = product.rating,
+                category = product.categoryName ?: product.category?.name ?: "All",
+                rating = product.rating ?: 0f,
                 reviewCount = product.reviewCount,
                 deliveryEstimate = product.deliveryEstimate,
                 availability = product.availability,

@@ -1,6 +1,7 @@
 import { Order, OrderStatus, PaymentMethod, PaymentStatus } from '../../models/Order';
 import { CheckoutService } from '../checkout/checkout.service';
 import { CartService } from '../cart/cart.service';
+import { RazorpayService } from '../payment/razorpay.service';
 import { getFirestoreDb } from '../../config/firebase';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
@@ -36,10 +37,26 @@ export class OrderService {
 
     if (params.paymentMethod === 'COD') {
       paymentStatus = 'COD_PENDING';
-      orderStatus = 'PLACED';
-    } else if (params.paymentMethod === 'RAZORPAY' || params.paymentMethod === 'ONLINE_PAYMENT') {
-      paymentStatus = 'PAID';
       orderStatus = 'CONFIRMED';
+    } else if (params.paymentMethod === 'RAZORPAY' || params.paymentMethod === 'ONLINE_PAYMENT') {
+      if (params.razorpayOrderId && params.paymentId && params.razorpaySignature) {
+        const isSigValid = RazorpayService.verifyPaymentSignature(
+          params.razorpayOrderId,
+          params.paymentId,
+          params.razorpaySignature
+        );
+
+        if (isSigValid) {
+          paymentStatus = 'PAID';
+          orderStatus = 'CONFIRMED';
+        } else {
+          paymentStatus = 'PENDING';
+          orderStatus = 'PAYMENT_PENDING';
+        }
+      } else {
+        paymentStatus = 'PENDING';
+        orderStatus = 'PAYMENT_PENDING';
+      }
     }
 
     const order: Order = {
@@ -56,6 +73,7 @@ export class OrderService {
       paymentMethod: params.paymentMethod,
       paymentStatus,
       orderStatus,
+      paymentId: params.paymentId,
       shippingAddress: {
         name: preview.address.name,
         phone: preview.address.phone,
@@ -79,7 +97,44 @@ export class OrderService {
       await CartService.clearCart(userId);
     }
 
-    logger.info(`[OrderService] Order created: orderId=${orderId}, userId=${userId}, status=${orderStatus}`);
+    logger.info(`[OrderService] Order created: orderId=${orderId}, userId=${userId}, status=${orderStatus}, paymentStatus=${paymentStatus}`);
+    return order;
+  }
+
+  /**
+   * Atomic, idempotent server-side payment verification
+   */
+  public static async verifyOrderPayment(
+    userId: string,
+    orderId: string,
+    params: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }
+  ): Promise<Order> {
+    const order = await this.getOrderById(userId, orderId);
+
+    // Idempotency check: if already paid with same paymentId, return order
+    if (order.paymentStatus === 'PAID' && order.paymentId === params.razorpayPaymentId) {
+      logger.info(`[OrderService] Order ${orderId} already verified and marked PAID.`);
+      return order;
+    }
+
+    const isSigValid = RazorpayService.verifyPaymentSignature(
+      params.razorpayOrderId,
+      params.razorpayPaymentId,
+      params.razorpaySignature
+    );
+
+    if (!isSigValid) {
+      throw new BadRequestError('Invalid Razorpay payment signature.');
+    }
+
+    order.paymentStatus = 'PAID';
+    order.orderStatus = 'CONFIRMED';
+    order.paymentId = params.razorpayPaymentId;
+    order.updatedAt = Date.now();
+
+    await this.saveOrder(order);
+    logger.info(`[OrderService] Payment verified and order updated: orderId=${orderId}, paymentId=${params.razorpayPaymentId}`);
+
     return order;
   }
 

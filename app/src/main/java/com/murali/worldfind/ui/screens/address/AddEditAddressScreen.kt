@@ -75,7 +75,7 @@ fun AddEditAddressScreen(
             WorldFindTextField(
                 value = phone, 
                 onValueChange = { phone = it; errorText = null }, 
-                label = "Phone Number", 
+                label = "Phone Number (10 Digits)", 
                 keyboardType = KeyboardType.Phone,
                 enabled = !isSaving
             )
@@ -110,7 +110,7 @@ fun AddEditAddressScreen(
             WorldFindTextField(
                 value = postalCode, 
                 onValueChange = { postalCode = it; errorText = null }, 
-                label = "Postal Code", 
+                label = "PIN Code (6 Digits)", 
                 keyboardType = KeyboardType.Number,
                 enabled = !isSaving
             )
@@ -137,13 +137,20 @@ fun AddEditAddressScreen(
                 loading = isSaving,
                 enabled = !isSaving,
                 onClick = {
+                    val cleanPhone = phone.filter { it.isDigit() }
+                    val cleanPin = postalCode.filter { it.isDigit() }
+
                     when {
                         name.isBlank() -> errorText = "Please enter your full name."
                         phone.isBlank() -> errorText = "Please enter your phone number."
+                        cleanPhone.length < 10 || !cleanPhone.takeLast(10).matches(Regex("^[6-9][0-9]{9}$")) ->
+                            errorText = "Please enter a valid 10-digit Indian mobile number."
                         addressLine.isBlank() -> errorText = "Please enter your address line."
                         city.isBlank() -> errorText = "Please enter your city."
                         state.isBlank() -> errorText = "Please enter your state."
-                        postalCode.isBlank() -> errorText = "Please enter your postal code."
+                        postalCode.isBlank() -> errorText = "Please enter your PIN code."
+                        !cleanPin.matches(Regex("^[1-9][0-9]{5}$")) ->
+                            errorText = "Please enter a valid 6-digit Indian PIN code (e.g. 110001, 400001, 560001)."
                         else -> {
                             isSaving = true
                             errorText = null
@@ -156,7 +163,7 @@ fun AddEditAddressScreen(
                                         addressLine = addressLine.trim(),
                                         city = city.trim(),
                                         state = state.trim(),
-                                        postalCode = postalCode.trim(),
+                                        postalCode = cleanPin,
                                         isDefault = isDefault
                                     )
                                     if (addressId == null) {

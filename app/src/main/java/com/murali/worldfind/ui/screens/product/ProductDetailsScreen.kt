@@ -257,7 +257,7 @@ fun ProductDetailsScreen(
 
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = "₹${CurrencyConverter.formatINR(product.priceInINR)}",
+                                text = CurrencyConverter.formatINR(product.priceInINR),
                                 color = MaterialTheme.colorScheme.onBackground,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold
@@ -266,7 +266,7 @@ fun ProductDetailsScreen(
                             if (product.originalPriceInINR != null && product.originalPriceInINR > product.priceInINR) {
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "₹${CurrencyConverter.formatINR(product.originalPriceInINR)}",
+                                    text = CurrencyConverter.formatINR(product.originalPriceInINR),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 16.sp,
                                     textDecoration = TextDecoration.LineThrough

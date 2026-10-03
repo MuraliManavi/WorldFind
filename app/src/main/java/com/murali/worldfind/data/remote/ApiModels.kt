@@ -32,21 +32,54 @@ data class ProductListResponse(
 )
 
 @Serializable
+data class BackendCategory(
+    val id: String? = null,
+    val name: String? = null
+)
+
+@Serializable
+data class BackendPrice(
+    val amount: Double = 0.0,
+    val currency: String = "INR",
+    val formatted: String = ""
+)
+
+@Serializable
+data class BackendCountry(
+    val code: String? = null,
+    val name: String? = null
+)
+
+@Serializable
+data class BackendShop(
+    val id: String? = null,
+    val name: String? = null,
+    val url: String? = null
+)
+
+@Serializable
 data class BackendProduct(
     val id: String,
     val title: String,
     val description: String = "",
     val imageUrl: String = "",
     val smallImages: List<String> = emptyList(),
-    val category: String = "All",
+    val category: BackendCategory? = null,
     val categoryId: String? = null,
     val categoryName: String? = null,
-    val rating: Float = 0f,
+    val firstLevelCategoryId: String? = null,
+    val firstLevelCategoryName: String? = null,
+    val secondLevelCategoryId: String? = null,
+    val secondLevelCategoryName: String? = null,
+    val price: BackendPrice? = null,
+    val originalPrice: BackendPrice? = null,
+    val rating: Float? = null,
     val reviewCount: Int = 0,
     val deliveryEstimate: String = "Estimated delivery unavailable",
     val estimatedDeliveryDays: Int? = null,
     val availability: Boolean = true,
     val brand: String? = null,
+    val country: BackendCountry? = null,
     val countryId: String = "IN",
     val countryName: String = "India",
     val countryCode: String = "IN",
@@ -56,6 +89,7 @@ data class BackendProduct(
     val priceInINR: Double = 0.0,
     val originalPriceInINR: Double? = null,
     val discountPercent: Int? = null,
+    val shop: BackendShop? = null,
     val shopUrl: String? = null,
     val videoUrl: String? = null,
     val affiliateUrl: String? = null,
@@ -66,6 +100,7 @@ data class BackendProduct(
 data class CategoryDto(
     val id: String,
     val name: String,
+    val parentId: String? = null,
     val icon: String? = null
 )
 

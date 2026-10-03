@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.murali.worldfind.data.models.Product
-import com.murali.worldfind.data.remote.CategoryDto
 import com.murali.worldfind.ui.components.ProductCard
 import com.murali.worldfind.ui.components.WorldFindSearchBar
 import com.murali.worldfind.ui.components.WorldFindTopBar
@@ -46,22 +45,6 @@ fun HomeScreen(
     val categoriesState by mainViewModel.categoriesState.collectAsState()
 
     val displayName = currentUser?.displayName ?: "Guest"
-
-    val defaultCategoryList = remember {
-        listOf(
-            CategoryDto("1", "Electronics", "📱"),
-            CategoryDto("2", "Fashion", "👕"),
-            CategoryDto("3", "Home", "🏠"),
-            CategoryDto("4", "Beauty", "💄"),
-            CategoryDto("5", "Sports", "⚽"),
-            CategoryDto("6", "Gadgets", "⌚")
-        )
-    }
-
-    val categories: List<CategoryDto> = when (val cState = categoriesState) {
-        is UiState.Success -> if (cState.data.isNotEmpty()) cState.data else defaultCategoryList
-        else -> defaultCategoryList
-    }
 
     Scaffold(
         topBar = {
@@ -191,12 +174,55 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(categories) { category ->
-                                    CategoryItem(category.name, category.icon ?: "📦") {
-                                        onCategoryClick(category.id)
+                            when (val catState = categoriesState) {
+                                is UiState.Loading -> {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        repeat(3) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(110.dp)
+                                                    .height(42.dp)
+                                                    .background(
+                                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                            )
+                                        }
+                                    }
+                                }
+
+                                is UiState.Error -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Failed to load categories",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 13.sp
+                                        )
+                                        TextButton(onClick = { mainViewModel.loadCategories() }) {
+                                            Text("Retry", fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+
+                                is UiState.Success -> {
+                                    if (catState.data.isNotEmpty()) {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            items(catState.data) { category ->
+                                                CategoryItem(category.name, category.icon ?: "📦") {
+                                                    onCategoryClick(category.name)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
